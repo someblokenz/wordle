@@ -16,7 +16,7 @@ on:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
-  contents: read
+  contents: write   # lets the job commit answers.json back to the repo
   pages: write
   id-token: write
 
@@ -41,16 +41,20 @@ jobs:
         with:
           node-version: 22
 
-      # Keep previously fetched answers between runs so we only fetch what's new.
-      - name: Restore answers cache
-        uses: actions/cache@v4
-        with:
-          path: answers.json
-          key: answers-${{ github.run_id }}
-          restore-keys: answers-
-
+      # answers.json lives in the repo (committed below), so it is incremental
+      # between runs and also present for a plain "deploy from branch" Pages build.
       - name: Build answers.json
         run: node scripts/build-answers.mjs answers.json
+
+      - name: Commit answers.json
+        run: |
+          if [ -n "$(git status --porcelain answers.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add answers.json
+            git commit -m "Update answers.json"
+            git push
+          fi
 
       - name: Stage site
         run: |
