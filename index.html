@@ -245,6 +245,10 @@
       });
 
       const cache = new Map();
+      let bundledPromise;
+      const loadBundled = () => (bundledPromise ??= fetch("answers.json", { cache: "no-cache" })
+        .then((r) => (r.ok ? r.json() : {}))
+        .catch(() => ({})));
       let timers = [];
       let token = 0;
 
@@ -329,6 +333,17 @@
         tilesEl.classList.add("loading");
         setStatus("Fetching…", pretty(date));
 
+        // 1. Bundled answers (built by the GitHub Action; same origin, so no CORS).
+        const bundled = await loadBundled();
+        if (mine !== token) return;
+        const hit = bundled[date];
+        if (hit && typeof hit.solution === "string") {
+          cache.set(date, hit);
+          showResult(hit, date);
+          return;
+        }
+
+        // 2. Fall back to the live endpoint (works only if the browser is allowed to call it).
         try {
           const res = await fetch(endpoint(date), { headers: { Accept: "application/json" } });
           if (mine !== token) return;
@@ -346,6 +361,11 @@
         } catch (err) {
           if (mine !== token) return;
           resetTiles("?????", "error");
+          if (Object.keys(bundled).length) {
+            // We have the full archive, so a miss means NYT hasn't published it.
+            setStatus("No puzzle for this date", "It may not have been published yet.", true);
+            return;
+          }
           const link = document.createElement("a");
           link.href = endpoint(date); link.target = "_blank"; link.rel = "noopener";
           link.textContent = "Open the source directly";
