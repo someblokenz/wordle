@@ -95,7 +95,8 @@
 
     label.field { display: block; font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
 
-    .picker { display: grid; grid-template-columns: 48px 1fr 48px; gap: 8px; }
+    .fields { display: grid; grid-template-columns: 70px 1fr 92px; gap: 8px; }
+    .nav { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; margin-top: 10px; }
 
     .btn {
       appearance: none; -webkit-appearance: none;
@@ -115,27 +116,30 @@
     .btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
     @media (hover: hover) { .btn:hover:not(:disabled) { border-color: var(--accent); } }
 
-    input[type="date"] {
+    select {
       appearance: none; -webkit-appearance: none;
       width: 100%; min-width: 0;
       min-height: 52px;
-      padding: 0 14px;
+      padding: 0 24px 0 10px;
       font: inherit; font-size: 1.05rem; font-weight: 700; /* >=16px stops iOS zoom */
       color: var(--text);
-      background: var(--surface-2);
+      background-color: var(--surface-2);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 7px center;
+      background-size: 14px;
       border: 1px solid var(--line);
       border-radius: 12px;
-      text-align: center;
+      text-overflow: ellipsis;
       color-scheme: light dark;
+      cursor: pointer;
     }
-    input[type="date"]::-webkit-date-and-time-value { text-align: center; }
+    select:invalid, select.empty { color: var(--muted); }
+    @media (hover: hover) { select:hover { border-color: var(--accent); } }
 
-    :is(.btn, input):focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    :is(.btn, select):focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
-    .today {
-      margin-top: 10px; width: 100%; min-height: 44px; font-size: .9rem;
-      background: transparent; color: var(--muted);
-    }
+    .today { min-height: 52px; font-size: .95rem; color: var(--muted); }
 
     /* ---------- tiles ---------- */
     .result { margin-top: 22px; padding-top: 22px; border-top: 1px dashed var(--line); text-align: center; }
@@ -181,6 +185,11 @@
 
     footer { margin-top: 18px; text-align: center; color: var(--muted); font-size: .78rem; }
 
+    @media (max-width: 380px) {
+      .fields { grid-template-columns: 58px 1fr 80px; gap: 6px; }
+      select { padding: 0 18px 0 8px; background-position: right 5px center; background-size: 12px; font-size: 1rem; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .tile.flip, .loading .tile { animation: none; }
       .btn { transition: none; }
@@ -201,17 +210,21 @@
     </header>
 
     <section class="card">
-      <label class="field" for="date">Puzzle date</label>
-      <div class="picker">
+      <label class="field" id="date-label">Puzzle date</label>
+      <div class="fields" role="group" aria-labelledby="date-label">
+        <select id="day" aria-label="Day"></select>
+        <select id="month" aria-label="Month"></select>
+        <select id="year" aria-label="Year"></select>
+      </div>
+      <div class="nav">
         <button class="btn" id="prev" type="button" aria-label="Previous day">
           <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
         </button>
-        <input id="date" type="date" min="2021-06-19" autocomplete="off">
+        <button class="btn today" id="today" type="button">Jump to today</button>
         <button class="btn" id="next" type="button" aria-label="Next day">
           <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
         </button>
       </div>
-      <button class="btn today" id="today" type="button">Jump to today</button>
 
       <div class="result">
         <div class="tiles" id="tiles" aria-hidden="true"></div>
@@ -233,7 +246,8 @@
       const endpoint = (d) => `https://www.nytimes.com/svc/wordle/v2/${d}.json`;
 
       const $ = (id) => document.getElementById(id);
-      const dateEl = $("date"), prevEl = $("prev"), nextEl = $("next"), todayEl = $("today");
+      const dayEl = $("day"), monthEl = $("month"), yearEl = $("year");
+      const prevEl = $("prev"), nextEl = $("next"), todayEl = $("today");
       const tilesEl = $("tiles"), statusEl = $("status");
       const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -262,9 +276,49 @@
         const n = new Date(), p = (v) => String(v).padStart(2, "0");
         return `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())}`;
       };
-      const pretty = (iso) =>
-        new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeZone: "UTC" })
-          .format(new Date(iso + "T00:00:00Z"));
+      // Always day-month-year, whatever the visitor's browser locale is.
+      const MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+                      "August", "September", "October", "November", "December"];
+      const pretty = (iso) => {
+        const [y, m, d] = iso.split("-").map(Number);
+        const weekday = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: "UTC" })
+          .format(new Date(Date.UTC(y, m - 1, d)));
+        return `${weekday} ${d} ${MONTHS[m - 1]} ${y}`;
+      };
+
+      /* ---------- day / month / year dropdowns ---------- */
+      const daysIn = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate(); // m is 1-12
+      const lastYear = Number(addDays(localToday(), 31).slice(0, 4));    // answers exist ~30 days ahead
+
+      const fill = (el, placeholder, options) => {
+        el.replaceChildren(new Option(placeholder, ""), ...options.map(([v, t]) => new Option(t, v)));
+      };
+      fill(dayEl, "Day", Array.from({ length: 31 }, (_, i) => [i + 1, i + 1]));
+      // Full month names, abbreviated on very narrow phones so they don't get clipped.
+      const narrow = matchMedia("(max-width: 380px)");
+      const fillMonths = () => {
+        const keep = monthEl.value;
+        fill(monthEl, "Month", MONTHS.map((n, i) => [i + 1, narrow.matches ? n.slice(0, 3) : n]));
+        monthEl.value = keep;
+      };
+      fillMonths();
+      narrow.addEventListener("change", fillMonths);
+      fill(yearEl, "Year", Array.from({ length: lastYear - 2021 + 1 }, (_, i) => [2021 + i, 2021 + i]));
+      [dayEl, monthEl, yearEl].forEach((el) => el.addEventListener("change", () => el.classList.toggle("empty", !el.value)));
+
+      const readDate = () => {
+        const d = Number(dayEl.value), m = Number(monthEl.value), y = Number(yearEl.value);
+        if (!d || !m || !y) return "";
+        const p = (v) => String(v).padStart(2, "0");
+        return `${y}-${p(m)}-${p(Math.min(d, daysIn(y, m)))}`; // 31 Feb -> 28/29 Feb
+      };
+      const writeDate = (iso) => {
+        const [y, m, d] = iso ? iso.split("-").map(Number) : ["", "", ""];
+        if (y && ![...yearEl.options].some((o) => o.value === String(y))) yearEl.add(new Option(y, y)); // e.g. odd #hash
+        yearEl.value = y; monthEl.value = m; dayEl.value = d;
+        [dayEl, monthEl, yearEl].forEach((el) => el.classList.toggle("empty", !el.value));
+      };
+      writeDate("");
 
       /* ---------- rendering ---------- */
       const setStatus = (line1, line2 = "", isError = false) => {
@@ -375,7 +429,7 @@
 
       /* ---------- wiring ---------- */
       const setDate = (date, { push = true } = {}) => {
-        dateEl.value = date;
+        writeDate(date);
         prevEl.disabled = !isIso(date) || date <= MIN_DATE;
         nextEl.disabled = !isIso(date);
         if (push) {
@@ -384,15 +438,11 @@
         load(date);
       };
 
-      dateEl.addEventListener("change", () => setDate(dateEl.value));
-      prevEl.addEventListener("click", () => {
-        const base = isIso(dateEl.value) ? dateEl.value : localToday();
-        setDate(addDays(base, -1));
-      });
-      nextEl.addEventListener("click", () => {
-        const base = isIso(dateEl.value) ? dateEl.value : localToday();
-        setDate(addDays(base, 1));
-      });
+      // Only act once day, month and year are all chosen.
+      [dayEl, monthEl, yearEl].forEach((el) =>
+        el.addEventListener("change", () => { const d = readDate(); if (d) setDate(d); }));
+      prevEl.addEventListener("click", () => setDate(addDays(readDate() || localToday(), -1)));
+      nextEl.addEventListener("click", () => setDate(addDays(readDate() || localToday(), 1)));
       todayEl.addEventListener("click", () => setDate(localToday()));
 
       // Shareable links: page.html#2026-11-23
@@ -401,7 +451,7 @@
       else { prevEl.disabled = true; nextEl.disabled = true; }
       addEventListener("hashchange", () => {
         const h = location.hash.slice(1);
-        if (isIso(h) && h !== dateEl.value) setDate(h, { push: false });
+        if (isIso(h) && h !== readDate()) setDate(h, { push: false });
       });
     })();
   </script>
