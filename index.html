@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Wordle Answer by Date</title>
+  <meta name="description" content="Pick a date and see that day's Wordle answer. Spoilers ahead.">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236aaa64'/%3E%3Ctext x='16' y='23' font-family='Arial,sans-serif' font-size='20' font-weight='800' text-anchor='middle' fill='white'%3EW%3C/text%3E%3C/svg%3E">
+
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --bg-glow: rgba(106, 170, 100, .18);
+      --surface: #ffffff;
+      --surface-2: #ece8de;
+      --text: #1a1a1b;
+      --muted: #6b6b6e;
+      --line: #d3cfc4;
+      --accent: #6aaa64;       /* wordle green */
+      --accent-ink: #ffffff;
+      --yellow: #c9b458;
+      --grey: #787c7e;
+      --tile-empty: #ffffff;
+      --tile-empty-line: #d3d6da;
+      --danger: #b3261e;
+      --shadow: 0 1px 2px rgba(0,0,0,.06), 0 12px 32px -12px rgba(0,0,0,.18);
+      --radius: 18px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121214;
+        --bg-glow: rgba(106, 170, 100, .16);
+        --surface: #1c1c1f;
+        --surface-2: #28282c;
+        --text: #f3f3f1;
+        --muted: #9a9a9f;
+        --line: #333338;
+        --tile-empty: #1c1c1f;
+        --tile-empty-line: #3a3a3c;
+        --danger: #ff8a80;
+        --shadow: 0 1px 2px rgba(0,0,0,.4), 0 16px 40px -16px rgba(0,0,0,.7);
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100dvh;
+      background:
+        radial-gradient(120% 60% at 50% -10%, var(--bg-glow), transparent 70%),
+        var(--bg);
+      color: var(--text);
+      font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    }
+
+    main { width: 100%; max-width: 440px; margin: auto 0; }
+
+    /* ---------- header ---------- */
+    header { text-align: center; margin-bottom: 22px; }
+    .mark { display: inline-flex; gap: 5px; margin-bottom: 14px; }
+    .mark i {
+      display: block; width: 14px; height: 14px; border-radius: 3px;
+      background: var(--grey);
+    }
+    .mark i:nth-child(1) { background: var(--accent); }
+    .mark i:nth-child(2) { background: var(--yellow); }
+    .mark i:nth-child(3) { background: var(--accent); }
+    h1 {
+      margin: 0;
+      font-size: clamp(1.6rem, 7vw, 2.1rem);
+      font-weight: 800;
+      letter-spacing: -.02em;
+      line-height: 1.1;
+    }
+    .sub { margin: 8px 0 0; color: var(--muted); font-size: .95rem; }
+
+    /* ---------- card ---------- */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    label.field { display: block; font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+
+    .picker { display: grid; grid-template-columns: 48px 1fr 48px; gap: 8px; }
+
+    .btn {
+      appearance: none; -webkit-appearance: none;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      color: var(--text);
+      font: inherit; font-weight: 700;
+      border-radius: 12px;
+      min-height: 52px;
+      cursor: pointer;
+      display: grid; place-items: center;
+      transition: transform .08s ease, background .15s ease, border-color .15s ease, opacity .15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active:not(:disabled) { transform: scale(.95); }
+    .btn:disabled { opacity: .35; cursor: not-allowed; }
+    .btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+    @media (hover: hover) { .btn:hover:not(:disabled) { border-color: var(--accent); } }
+
+    input[type="date"] {
+      appearance: none; -webkit-appearance: none;
+      width: 100%; min-width: 0;
+      min-height: 52px;
+      padding: 0 14px;
+      font: inherit; font-size: 1.05rem; font-weight: 700; /* >=16px stops iOS zoom */
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      text-align: center;
+      color-scheme: light dark;
+    }
+    input[type="date"]::-webkit-date-and-time-value { text-align: center; }
+
+    :is(.btn, input):focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+    .today {
+      margin-top: 10px; width: 100%; min-height: 44px; font-size: .9rem;
+      background: transparent; color: var(--muted);
+    }
+
+    /* ---------- tiles ---------- */
+    .result { margin-top: 22px; padding-top: 22px; border-top: 1px dashed var(--line); text-align: center; }
+
+    .tiles {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: clamp(5px, 2vw, 9px);
+      max-width: 340px; margin: 0 auto;
+      perspective: 600px;
+    }
+    .tile {
+      aspect-ratio: 1;
+      display: grid; place-items: center;
+      font-size: clamp(1.7rem, 9vw, 2.4rem);
+      font-weight: 800;
+      text-transform: uppercase;
+      border-radius: 6px;
+      background: var(--tile-empty);
+      border: 2px solid var(--tile-empty-line);
+      color: var(--muted);
+      user-select: none;
+    }
+    .tile.filled { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+    .tile.error  { border-color: var(--danger); color: var(--danger); }
+
+    .tile.flip { animation: flip .6s ease both; }
+    @keyframes flip {
+      0%   { transform: rotateX(0); }
+      50%  { transform: rotateX(90deg); }
+      100% { transform: rotateX(0); }
+    }
+    .loading .tile { animation: pulse 1s ease-in-out infinite; }
+    .loading .tile:nth-child(2) { animation-delay: .1s; }
+    .loading .tile:nth-child(3) { animation-delay: .2s; }
+    .loading .tile:nth-child(4) { animation-delay: .3s; }
+    .loading .tile:nth-child(5) { animation-delay: .4s; }
+    @keyframes pulse { 50% { opacity: .45; transform: scale(.94); } }
+
+    .status { margin: 18px 0 0; min-height: 3.2em; }
+    .status .line1 { font-weight: 700; font-size: 1.05rem; }
+    .status .line2 { color: var(--muted); font-size: .9rem; margin-top: 2px; white-space: pre-line; }
+    .status.err .line1 { color: var(--danger); }
+    .status a { color: inherit; text-underline-offset: 3px; }
+
+    footer { margin-top: 18px; text-align: center; color: var(--muted); font-size: .78rem; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .tile.flip, .loading .tile { animation: none; }
+      .btn { transition: none; }
+    }
+    @media (min-width: 480px) {
+      .card { padding: 26px; }
+      .picker { grid-template-columns: 52px 1fr 52px; }
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <header>
+      <div class="mark" aria-hidden="true"><i></i><i></i><i></i></div>
+      <h1>Wordle answer by date</h1>
+      <p class="sub">Pick a day. Spoilers, obviously.</p>
+    </header>
+
+    <section class="card">
+      <label class="field" for="date">Puzzle date</label>
+      <div class="picker">
+        <button class="btn" id="prev" type="button" aria-label="Previous day">
+          <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <input id="date" type="date" min="2021-06-19" autocomplete="off">
+        <button class="btn" id="next" type="button" aria-label="Next day">
+          <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+      <button class="btn today" id="today" type="button">Jump to today</button>
+
+      <div class="result">
+        <div class="tiles" id="tiles" aria-hidden="true"></div>
+        <div class="status" id="status" role="status" aria-live="polite">
+          <div class="line1">Choose a date above</div>
+          <div class="line2">The answer appears here.</div>
+        </div>
+      </div>
+    </section>
+
+    <footer>Unofficial. Not affiliated with The New York Times.</footer>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const MIN_DATE = "2021-06-19"; // first-ever Wordle
+      const endpoint = (d) => `https://www.nytimes.com/svc/wordle/v2/${d}.json`;
+
+      const $ = (id) => document.getElementById(id);
+      const dateEl = $("date"), prevEl = $("prev"), nextEl = $("next"), todayEl = $("today");
+      const tilesEl = $("tiles"), statusEl = $("status");
+      const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+      const tiles = Array.from({ length: 5 }, () => {
+        const t = document.createElement("div");
+        t.className = "tile";
+        tilesEl.appendChild(t);
+        return t;
+      });
+
+      const cache = new Map();
+      let timers = [];
+      let token = 0;
+
+      /* ---------- date helpers (all string-based, no timezone surprises) ---------- */
+      const isIso = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s + "T00:00:00Z"));
+      const addDays = (iso, n) => {
+        const [y, m, d] = iso.split("-").map(Number);
+        return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+      };
+      const localToday = () => {
+        const n = new Date(), p = (v) => String(v).padStart(2, "0");
+        return `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())}`;
+      };
+      const pretty = (iso) =>
+        new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeZone: "UTC" })
+          .format(new Date(iso + "T00:00:00Z"));
+
+      /* ---------- rendering ---------- */
+      const setStatus = (line1, line2 = "", isError = false) => {
+        statusEl.className = "status" + (isError ? " err" : "");
+        statusEl.replaceChildren();
+        const a = document.createElement("div"); a.className = "line1"; a.textContent = line1;
+        const b = document.createElement("div"); b.className = "line2";
+        if (line2 instanceof Node) b.appendChild(line2); else b.textContent = line2;
+        statusEl.append(a, b);
+      };
+
+      const resetTiles = (text = "", cls = "") => {
+        timers.forEach(clearTimeout); timers = [];
+        tilesEl.classList.remove("loading");
+        tiles.forEach((t, i) => {
+          t.className = "tile" + (cls ? " " + cls : "");
+          t.textContent = text ? text[i] || "" : "";
+        });
+      };
+
+      const reveal = (word, after) => {
+        resetTiles();
+        const step = reduceMotion.matches ? 0 : 130;
+        tiles.forEach((t, i) => {
+          timers.push(setTimeout(() => {
+            if (step) t.classList.add("flip");
+            timers.push(setTimeout(() => {
+              t.textContent = word[i];
+              t.classList.add("filled");
+            }, step ? 300 : 0));
+          }, i * step));
+        });
+        timers.push(setTimeout(after, step ? 4 * step + 600 : 0));
+      };
+
+      const showResult = (data, date) => {
+        const word = String(data.solution).toUpperCase();
+        reveal(word, () => {
+          const line2 = [pretty(date), data.editor && `Edited by ${data.editor}`].filter(Boolean).join("\n");
+          setStatus(`Wordle #${data.id}`, line2);
+          statusEl.setAttribute("aria-label", `Wordle ${data.id} answer: ${word}`);
+        });
+        // announce the word for assistive tech immediately (tiles are aria-hidden)
+        statusEl.setAttribute("aria-label", `Answer: ${word}`);
+      };
+
+      /* ---------- data ---------- */
+      const load = async (date) => {
+        const mine = ++token;
+        statusEl.removeAttribute("aria-label");
+
+        if (!isIso(date)) {
+          resetTiles();
+          setStatus("Choose a date above", "The answer appears here.");
+          return;
+        }
+        if (date < MIN_DATE) {
+          resetTiles("?????", "error");
+          setStatus("Too early", "Wordle launched on 19 June 2021.", true);
+          return;
+        }
+
+        if (cache.has(date)) { showResult(cache.get(date), date); return; }
+
+        resetTiles();
+        tilesEl.classList.add("loading");
+        setStatus("Fetching…", pretty(date));
+
+        try {
+          const res = await fetch(endpoint(date), { headers: { Accept: "application/json" } });
+          if (mine !== token) return;
+          if (res.status === 404) {
+            resetTiles("?????", "error");
+            setStatus("No puzzle for this date", "It may not have been published yet.", true);
+            return;
+          }
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const data = await res.json();
+          if (mine !== token) return;
+          if (!data || typeof data.solution !== "string") throw new Error("Unexpected response");
+          cache.set(date, data);
+          showResult(data, date);
+        } catch (err) {
+          if (mine !== token) return;
+          resetTiles("?????", "error");
+          const link = document.createElement("a");
+          link.href = endpoint(date); link.target = "_blank"; link.rel = "noopener";
+          link.textContent = "Open the source directly";
+          setStatus("Couldn't load that answer", link, true);
+        }
+      };
+
+      /* ---------- wiring ---------- */
+      const setDate = (date, { push = true } = {}) => {
+        dateEl.value = date;
+        prevEl.disabled = !isIso(date) || date <= MIN_DATE;
+        nextEl.disabled = !isIso(date);
+        if (push) {
+          try { history.replaceState(null, "", date ? "#" + date : location.pathname + location.search); } catch (_) {}
+        }
+        load(date);
+      };
+
+      dateEl.addEventListener("change", () => setDate(dateEl.value));
+      prevEl.addEventListener("click", () => {
+        const base = isIso(dateEl.value) ? dateEl.value : localToday();
+        setDate(addDays(base, -1));
+      });
+      nextEl.addEventListener("click", () => {
+        const base = isIso(dateEl.value) ? dateEl.value : localToday();
+        setDate(addDays(base, 1));
+      });
+      todayEl.addEventListener("click", () => setDate(localToday()));
+
+      // Shareable links: page.html#2026-11-23
+      const fromHash = location.hash.slice(1);
+      if (isIso(fromHash)) setDate(fromHash, { push: false });
+      else { prevEl.disabled = true; nextEl.disabled = true; }
+      addEventListener("hashchange", () => {
+        const h = location.hash.slice(1);
+        if (isIso(h) && h !== dateEl.value) setDate(h, { push: false });
+      });
+    })();
+  </script>
+</body>
+</html>
