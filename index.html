@@ -93,9 +93,12 @@
       padding: 18px;
     }
 
-    label.field { display: block; font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
-
-    .fields { display: grid; grid-template-columns: 70px 1fr 92px; gap: 8px; }
+    .fields { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.6fr) minmax(0, 1fr); gap: 8px; }
+    .col { display: block; min-width: 0; }
+    .col > span {
+      display: block; text-align: center; margin-bottom: 6px;
+      font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+    }
     .nav { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; margin-top: 10px; }
 
     .btn {
@@ -119,23 +122,21 @@
     select {
       appearance: none; -webkit-appearance: none;
       width: 100%; min-width: 0;
-      min-height: 52px;
-      padding: 0 24px 0 10px;
-      font: inherit; font-size: 1.05rem; font-weight: 700; /* >=16px stops iOS zoom */
+      min-height: 56px;
+      padding: 0 6px;
+      font: inherit; font-size: 1.2rem; font-weight: 800; /* >=16px stops iOS zoom */
+      text-align: center; text-align-last: center;        /* value centred, no arrow needed */
       color: var(--text);
       background-color: var(--surface-2);
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 7px center;
-      background-size: 14px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      text-overflow: ellipsis;
+      border: 2px solid var(--tile-empty-line);
+      border-radius: 10px;                                /* tile-like, matches the answer below */
       color-scheme: light dark;
       cursor: pointer;
+      transition: border-color .15s ease, background-color .15s ease;
     }
-    select:invalid, select.empty { color: var(--muted); }
-    @media (hover: hover) { select:hover { border-color: var(--accent); } }
+    select.empty { color: var(--muted); }
+    select:not(.empty) { border-color: var(--accent); }   /* chosen = green outline */
+    @media (hover: hover) { select:hover { background-color: var(--surface); border-color: var(--accent); } }
 
     :is(.btn, select):focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
@@ -146,7 +147,7 @@
 
     .tiles {
       display: grid; grid-template-columns: repeat(5, 1fr); gap: clamp(5px, 2vw, 9px);
-      max-width: 340px; margin: 0 auto;
+      max-width: 374px; margin: 0 auto;
       perspective: 600px;
     }
     .tile {
@@ -185,9 +186,9 @@
 
     footer { margin-top: 18px; text-align: center; color: var(--muted); font-size: .78rem; }
 
-    @media (max-width: 380px) {
-      .fields { grid-template-columns: 58px 1fr 80px; gap: 6px; }
-      select { padding: 0 18px 0 8px; background-position: right 5px center; background-size: 12px; font-size: 1rem; }
+    @media (max-width: 374px) {
+      .fields { gap: 6px; }
+      select { font-size: 1.05rem; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -210,11 +211,10 @@
     </header>
 
     <section class="card">
-      <label class="field" id="date-label">Puzzle date</label>
-      <div class="fields" role="group" aria-labelledby="date-label">
-        <select id="day" aria-label="Day"></select>
-        <select id="month" aria-label="Month"></select>
-        <select id="year" aria-label="Year"></select>
+      <div class="fields" role="group" aria-label="Puzzle date">
+        <label class="col"><span>Day</span><select id="day"></select></label>
+        <label class="col"><span>Month</span><select id="month"></select></label>
+        <label class="col"><span>Year</span><select id="year"></select></label>
       </div>
       <div class="nav">
         <button class="btn" id="prev" type="button" aria-label="Previous day">
@@ -293,17 +293,17 @@
       const fill = (el, placeholder, options) => {
         el.replaceChildren(new Option(placeholder, ""), ...options.map(([v, t]) => new Option(t, v)));
       };
-      fill(dayEl, "Day", Array.from({ length: 31 }, (_, i) => [i + 1, i + 1]));
+      fill(dayEl, "–",Array.from({ length: 31 }, (_, i) => [i + 1, i + 1]));
       // Full month names, abbreviated on very narrow phones so they don't get clipped.
-      const narrow = matchMedia("(max-width: 380px)");
+      const narrow = matchMedia("(max-width: 374px)");
       const fillMonths = () => {
         const keep = monthEl.value;
-        fill(monthEl, "Month", MONTHS.map((n, i) => [i + 1, narrow.matches ? n.slice(0, 3) : n]));
+        fill(monthEl, "–",MONTHS.map((n, i) => [i + 1, narrow.matches ? n.slice(0, 3) : n]));
         monthEl.value = keep;
       };
       fillMonths();
       narrow.addEventListener("change", fillMonths);
-      fill(yearEl, "Year", Array.from({ length: lastYear - 2021 + 1 }, (_, i) => [2021 + i, 2021 + i]));
+      fill(yearEl, "–",Array.from({ length: lastYear - 2021 + 1 }, (_, i) => [2021 + i, 2021 + i]));
       [dayEl, monthEl, yearEl].forEach((el) => el.addEventListener("change", () => el.classList.toggle("empty", !el.value)));
 
       const readDate = () => {
